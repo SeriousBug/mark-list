@@ -1,0 +1,79 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+function handle_sigint() {
+    echo "SIGINT, exiting..." 1>&2
+    exit 1
+}
+trap handle_sigint SIGINT
+function handle_err() {
+    echo "Error in run.sh!" 1>&2
+    echo "$(caller): ${BASH_COMMAND}" 1>&2
+    echo "Exiting..." 1>&2
+    exit 2
+}
+trap handle_err ERR
+
+
+LISTDIR="${XDG_CACHE_HOME:-${HOME}/.cache}/mark-list/"
+mkdir -p "${LISTDIR}"
+LISTFILE="${LISTDIR}/default.list"
+
+
+case "$1" in
+    --help|-h)
+        cat <<EOF
+$0 [--help | --list | --count | --clear | <filename> ...]
+
+Mark files, then list all marked files.
+
+Example:
+
+    $0 --clear
+    $0 first.mp4
+    $0 second.webm
+    cd old_videos
+    $0 old.mp4
+    for file in `$0 --list` ; do ffmpeg -i "${file}" "${file}".mkv ; done
+
+Arguments:
+    -h,--help         Print this help.
+    -l,--list         Print the marked file names, each file separated by new lines.
+    -c,--count        Print the number of marked files.
+    --clear           Clear marked files.
+    <filename> ...    One or more files to be marked.
+EOF
+        exit 0
+        ;;
+    --list|-l)
+        if [[ -f "${LISTFILE}" ]] ; then
+            cat "${LISTFILE}"
+        fi
+        exit 0
+        ;;
+    --count|-c)
+        if [[ -f "${LISTFILE}" ]] ; then
+            wc -l <"${LISTFILE}"
+        else
+            echo 0
+        fi
+        exit 0
+        ;;
+    --clear)
+        rm -f "${LISTFILE}"
+        exit 0
+        ;;
+esac
+
+
+count=0
+for file in "$@"; do
+    echo $(realpath "${file}") >> "${LISTFILE}"
+    count=$((count+1))
+done
+if [[ count -eq 1 ]]; then
+    echo "Marked 1 file."
+else
+    echo "Marked ${count} files."
+fi
+exit 0
